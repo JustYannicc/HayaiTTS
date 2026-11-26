@@ -14,7 +14,7 @@
 
 > **This is a fork** of [HayaiApp/HayaiTTS](https://github.com/HayaiApp/HayaiTTS)
 > that ships independently. Fixes go upstream as PRs
-> ([#11](https://github.com/HayaiApp/HayaiTTS/pull/11)–[#15](https://github.com/HayaiApp/HayaiTTS/pull/15)),
+> ([#11](https://github.com/HayaiApp/HayaiTTS/pull/11)–[#16](https://github.com/HayaiApp/HayaiTTS/pull/16)),
 > but this fork doesn't wait for them. The live catalog and in-app updates come from
 > this repo. What's different:
 >
@@ -30,7 +30,7 @@
 >   device, but only among yours.
 > - **Microsoft Edge online voices** as an opt-out engine (Settings → Reading). Text is sent to
 >   Microsoft when an Edge route reads it.
-> - Kokoro mixed-text crash fix, import by magic bytes, and catalog metadata fixes
+> - Supertonic 3 speaks its 31 languages (was English-only), Kokoro mixed-text crash fix, import by magic bytes, and catalog metadata fixes
 >   (634 voices, hashes from upstream `checksum.txt`).
 >
 > Releases: [JustYannicc/HayaiTTS/releases](https://github.com/JustYannicc/HayaiTTS/releases).
