@@ -138,16 +138,16 @@ class UpdateChecker(
     }
 
     companion object {
-        const val RELEASES_URL =
-            "https://api.github.com/repos/HayaiApp/HayaiTTS/releases?per_page=30"
+        val RELEASES_URL =
+            "https://api.github.com/repos/${BuildConfig.SOURCE_REPO}/releases?per_page=30"
 
         /**
          * Dedicated nightly repo. The main repo now only hosts stable + beta
          * releases (see `.github/workflows/build_push.yml`); nightly `r###`
          * tags land here so users on the Nightly channel still get pinged.
          */
-        const val NIGHTLY_RELEASES_URL =
-            "https://api.github.com/repos/HayaiApp/HayaiTTS-nightly/releases?per_page=30"
+        // Fork: no separate nightly repo; nightlies are prereleases on the same repo.
+        val NIGHTLY_RELEASES_URL = RELEASES_URL
 
         // Matches the per-tag universal-ABI asset produced by build_push.yml:
         // `hayaitts-v<tag>.apk` (no ABI infix). The per-ABI files

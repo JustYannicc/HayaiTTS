@@ -14,7 +14,7 @@ on:
 jobs:
   build:
     name: Build app
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'HayaiApp/HayaiTTS' && 'blacksmith-8vcpu-ubuntu-2404' || 'ubuntu-latest' }}
 
     steps:
       - name: Clone repo
@@ -34,6 +34,7 @@ jobs:
           distribution: temurin
 
       - name: Mount Gradle home (sticky disk)
+        if: github.repository == 'HayaiApp/HayaiTTS'
         uses: useblacksmith/stickydisk@v1
         with:
           key: ${{ github.repository }}-gradle-home-pr

@@ -1,5 +1,6 @@
 package dev.ahmedmohamed.hayaitts.data.catalog
 
+import dev.ahmedmohamed.hayaitts.BuildConfig
 import android.content.Context
 import co.touchlab.kermit.Logger
 import dev.ahmedmohamed.hayaitts.core.dispatchers.DispatcherProvider
@@ -96,7 +97,7 @@ class CatalogRepositoryImpl(
         // default branch. Until the repo is pushed for the first time this 404s
         // and the bundled asset fallback wins (cf. `loadRemote()`); both paths
         // are silent on failure so users never see a network error toast.
-        private const val REMOTE_URL =
-            "https://raw.githubusercontent.com/HayaiApp/HayaiTTS/main/catalog/v1/models.json"
+        private val REMOTE_URL =
+            "https://raw.githubusercontent.com/${BuildConfig.SOURCE_REPO}/main/catalog/v1/models.json"
     }
 }

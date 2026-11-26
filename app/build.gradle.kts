@@ -32,7 +32,12 @@ android {
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 204
+
+        // Fork: where the live catalog and app updates come from. Override with
+        // -Phayaitts.sourceRepo=owner/repo.
+        val sourceRepo = (project.findProperty("hayaitts.sourceRepo") as String?) ?: "JustYannicc/HayaiTTS"
+        buildConfigField("String", "SOURCE_REPO", "\"$sourceRepo\"")
+        versionCode = 205
         // `HAYAITTS_VERSION_NAME` is exported by the release workflow as the
         // git tag (`v2.0.0`, `v2.0.0-b3`, or `r142`) so the installed APK's
         // `BuildConfig.VERSION_NAME` matches the release the user downloaded.
@@ -43,7 +48,7 @@ android {
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?.removePrefix("v")
-            ?: "2.5.1"
+            ?: "2.5.1.1"
 
         // Room schema export. KSP picks this up via the `room` argument and
         // writes JSON snapshots of each entity into app/schemas/. Schemas are
