@@ -64,6 +64,8 @@ permissions:
 jobs:
 
   plan:
+    # Publishes to upstream's samples repo.
+    if: github.repository == 'HayaiApp/HayaiTTS'
     runs-on: ubuntu-latest
     outputs:
       shards: ${{ steps.compute.outputs.shards }}
@@ -101,6 +103,7 @@ jobs:
           if-no-files-found: error
 
   prepare-assets-manifest:
+    if: github.repository == 'HayaiApp/HayaiTTS'
     # Lists every MP3 already published to the sharded sample releases
     # (and the legacy `samples-rolling` release on this repo during the
     # migration window) so the render jobs can skip combos that already

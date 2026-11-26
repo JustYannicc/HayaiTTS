@@ -29,6 +29,8 @@ concurrency:
 
 jobs:
   build:
+    # Publishes to upstream's release/nightly/samples repos; forks release via tools/fork/release.sh.
+    if: github.repository == 'HayaiApp/HayaiTTS'
     name: Build app
     runs-on: ${{ github.repository == 'HayaiApp/HayaiTTS' && 'blacksmith-8vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     environment: build
