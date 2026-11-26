@@ -5,6 +5,7 @@ import co.touchlab.kermit.Logger
 import dev.ahmedmohamed.hayaitts.data.catalog.catalogJson
 import dev.ahmedmohamed.hayaitts.data.db.dao.InstalledVoiceDao
 import dev.ahmedmohamed.hayaitts.data.db.entities.InstalledVoiceEntity
+import dev.ahmedmohamed.hayaitts.domain.model.VoiceTitles
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.ModelFamily
 import dev.ahmedmohamed.hayaitts.domain.model.Speaker
@@ -89,11 +90,17 @@ class VoiceRepositoryImpl(
     suspend fun installedSnapshot(): List<InstalledVoice> =
         dao.getAllSnapshot().map { it.toDomain() }
 
-    private fun InstalledVoiceEntity.toDomain(): InstalledVoice = InstalledVoice(
+    private fun InstalledVoiceEntity.toDomain(): InstalledVoice {
+        val langs = if (languages.isEmpty()) emptyList() else languages.split(',').map { it.trim() }
+        return toDomain(langs)
+    }
+
+    private fun InstalledVoiceEntity.toDomain(langs: List<String>): InstalledVoice = InstalledVoice(
         voiceId = voiceId,
         family = ModelFamily.fromCatalog(family),
-        title = title,
-        languages = if (languages.isEmpty()) emptyList() else languages.split(',').map { it.trim() },
+        // Voices installed before titles were cleaned up are stored as "Speaker_0".
+        title = VoiceTitles.display(voiceId, title, langs),
+        languages = langs,
         speakers = runCatching {
             catalogJson.decodeFromString(speakerListSerializer, speakersJson)
         }.getOrElse {

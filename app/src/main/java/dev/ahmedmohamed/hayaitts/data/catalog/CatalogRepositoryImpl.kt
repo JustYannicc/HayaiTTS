@@ -1,6 +1,7 @@
 package dev.ahmedmohamed.hayaitts.data.catalog
 
 import dev.ahmedmohamed.hayaitts.BuildConfig
+import dev.ahmedmohamed.hayaitts.domain.model.VoiceTitles
 import android.content.Context
 import co.touchlab.kermit.Logger
 import dev.ahmedmohamed.hayaitts.core.dispatchers.DispatcherProvider
@@ -66,8 +67,12 @@ class CatalogRepositoryImpl(
         val raw = context.assets.open(ASSET_PATH).bufferedReader().use { it.readText() }
         val manifest = catalogJson.decodeFromString<CatalogManifest>(raw)
         log.i { "Loaded bundled catalog (v${manifest.version}, ${manifest.voices.size} voices)" }
-        return manifest.voices
+        return manifest.voices.map { it.withReadableTitle() }
     }
+
+    /** Upstream titles anonymous voices `Speaker_0`; name them after their bundle instead. */
+    private fun VoiceCard.withReadableTitle(): VoiceCard =
+        VoiceTitles.display(id, title, languages).let { if (it == title) this else copy(title = it) }
 
     private fun fetchFromNetwork(): List<VoiceCard>? = try {
         val request = Request.Builder().url(REMOTE_URL).build()
@@ -83,7 +88,7 @@ class CatalogRepositoryImpl(
                 // field; we synthesize it here from the transport.
                 catalogJson.decodeFromString<CatalogManifest>(body)
                     .voices
-                    .map { it.copy(fromRemote = true) }
+                    .map { it.copy(fromRemote = true).withReadableTitle() }
             }
         }
     } catch (t: Throwable) {

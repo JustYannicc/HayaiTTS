@@ -22,6 +22,7 @@ import dev.ahmedmohamed.hayaitts.data.tts.SherpaSynthesisGateway
 import dev.ahmedmohamed.hayaitts.ui.activity.ActivityViewModel
 import dev.ahmedmohamed.hayaitts.domain.repo.CatalogRepository
 import dev.ahmedmohamed.hayaitts.data.routing.ReadingProfilesRepositoryImpl
+import dev.ahmedmohamed.hayaitts.data.routing.LanguageSync
 import dev.ahmedmohamed.hayaitts.data.routing.SpeechEnginesGatewayImpl
 import dev.ahmedmohamed.hayaitts.domain.repo.DefaultsRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.ReadingProfilesRepository
@@ -102,6 +103,7 @@ val appModule = module {
     single<SettingsRepository> { SettingsRepositoryImpl(androidContext()) }
     single<ReadingProfilesRepository> { ReadingProfilesRepositoryImpl(androidContext()) }
     single<SpeechEnginesGateway> { SpeechEnginesGatewayImpl(androidContext(), get(), get()) }
+    single { LanguageSync(get(), get(), get(), get(named("appScope"))) }
     single<VoiceRepositoryImpl> { VoiceRepositoryImpl(androidContext(), get()) }
     single<VoiceRepository> { get<VoiceRepositoryImpl>() }
     single<CatalogRepository> {

@@ -29,6 +29,9 @@ class ReadingViewModelTest {
     private class FakeRepo(initial: List<LanguageProfile>) : ReadingProfilesRepository {
         override val profiles = MutableStateFlow(initial)
         override suspend fun setProfiles(profiles: List<LanguageProfile>) { this.profiles.value = profiles }
+        override suspend fun updateProfiles(transform: (List<LanguageProfile>) -> List<LanguageProfile>) {
+            profiles.value = transform(profiles.value)
+        }
         override val onlineEnginesEnabled = MutableStateFlow(true)
         override suspend fun setOnlineEnginesEnabled(enabled: Boolean) { onlineEnginesEnabled.value = enabled }
         override val seeded = MutableStateFlow(true)

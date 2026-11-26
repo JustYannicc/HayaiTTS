@@ -3,6 +3,7 @@ package dev.ahmedmohamed.hayaitts.ui.reading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ahmedmohamed.hayaitts.core.result.Outcome
+import dev.ahmedmohamed.hayaitts.domain.model.LanguageTags
 import dev.ahmedmohamed.hayaitts.domain.model.LanguageProfile
 import dev.ahmedmohamed.hayaitts.domain.model.ReadingProfileEdits
 import dev.ahmedmohamed.hayaitts.domain.model.VoiceRoute
@@ -18,8 +19,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Drives the Reading settings screen: the user's languages, each one's
@@ -59,17 +58,14 @@ class ReadingViewModel(
 
         /** Voices of [engine] that speak [language]'s base language. */
         fun voicesFor(language: String, engine: String): List<RouteVoice> {
-            val base = language.substringBefore('-').lowercase()
-            return voices.filter { v ->
-                v.route.engine == engine && v.languages.any { it.substringBefore('-').lowercase() == base }
-            }
+            val bases = setOf(LanguageTags.base(language))
+            return voices.filter { v -> v.route.engine == engine && LanguageTags.speaksAny(v.languages, bases) }
         }
 
         fun voiceName(route: VoiceRoute): String? = voices.firstOrNull { it.route == route }?.displayName
     }
 
     private val local = MutableStateFlow(UiState())
-    private val editLock = Mutex()
     private val testJobs = HashMap<String, Job>()
 
     val uiState: StateFlow<UiState> = combine(local, repo.profiles, repo.onlineEnginesEnabled) { s, profiles, online ->
@@ -98,7 +94,12 @@ class ReadingViewModel(
         local.update { it.copy(onlineBenched = engines.isOnlineBenched()) }
     }
 
-    fun addLanguage(language: String) = edit { ReadingProfileEdits.addLanguage(it, language, engines.defaultRoutesFor(language)) }
+    fun addLanguage(language: String) {
+        viewModelScope.launch {
+            val routes = engines.defaultRoutesFor(language)
+            repo.updateProfiles { ReadingProfileEdits.addLanguage(it, language, routes) }
+        }
+    }
 
     fun removeLanguage(language: String) {
         stopTest(language)
@@ -151,14 +152,9 @@ class ReadingViewModel(
 
     private fun setTest(language: String, state: TestState) = local.update { it.copy(tests = it.tests + (language to state)) }
 
-    private fun edit(change: suspend (List<LanguageProfile>) -> List<LanguageProfile>) {
-        viewModelScope.launch {
-            editLock.withLock {
-                val current = repo.profiles.first()
-                val next = change(current)
-                if (next != current) repo.setProfiles(next)
-            }
-        }
+    /** Applies [change] atomically to the stored list, so the settings sync can't race it. */
+    private fun edit(change: (List<LanguageProfile>) -> List<LanguageProfile>) {
+        viewModelScope.launch { repo.updateProfiles(change) }
     }
 
     override fun onCleared() {

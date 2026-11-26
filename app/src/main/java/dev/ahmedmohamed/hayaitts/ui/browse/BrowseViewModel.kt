@@ -3,6 +3,7 @@ package dev.ahmedmohamed.hayaitts.ui.browse
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.ahmedmohamed.hayaitts.domain.model.LanguageTags
 import dev.ahmedmohamed.hayaitts.domain.model.DownloadState
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.ModelFamily
@@ -103,12 +104,12 @@ class BrowseViewModel(
         settingsRepository.allowedLanguages,
     ) { catalog, installed, downloads, f, allowed ->
         // Global allowed-language gate. Empty allowed set = no restriction
-        // (default). Any non-empty set hides voices that don't speak at
-        // least one of the selected tags. The gate runs *before* the
-        // per-screen filters so the Languages chip-strip and the result
-        // count both reflect what the user has globally enabled.
-        val scoped = if (allowed.isEmpty()) catalog
-            else catalog.filter { card -> card.languages.any { it in allowed } }
+        // (default). Matches by base language (`en` covers `en-US`), and a
+        // bilingual voice counts only for its main language. The gate runs
+        // *before* the per-screen filters so the Languages chip-strip and
+        // the result count both reflect what the user has globally enabled.
+        val allowedBases = allowed.mapTo(mutableSetOf(), LanguageTags::base)
+        val scoped = catalog.filter { card -> LanguageTags.voiceIn(card.languages, allowedBases) }
 
         val installedIds = installed.mapTo(mutableSetOf()) { it.voiceId }
         val filtered = scoped.applyFilters(f)
@@ -125,7 +126,7 @@ class BrowseViewModel(
             cards = sorted,
             installedIds = installedIds,
             downloads = downloads,
-            availableLanguages = scoped.flatMap { it.languages }.distinct().sorted(),
+            availableLanguages = scoped.flatMap { it.languages }.map(LanguageTags::base).filter { it.length in 2..3 }.distinct().sorted(),
             availableFamilies = scoped.map { it.modelFamily }.distinct(),
             availableGenders = scoped
                 .flatMap { card -> card.speakers.map { normaliseGender(it.gender) } }
@@ -170,7 +171,7 @@ class BrowseViewModel(
     fun cancel(voiceId: String) = downloadRepository.cancel(voiceId)
 
     private fun List<VoiceCard>.applyFilters(f: Filters): List<VoiceCard> = filter { card ->
-        (f.languages.isEmpty() || card.languages.any { it in f.languages }) &&
+        (f.languages.isEmpty() || LanguageTags.speaksAny(card.languages, f.languages)) &&
             (f.tier == null || card.tierEnum == f.tier) &&
             (f.families.isEmpty() || card.modelFamily in f.families) &&
             (f.genders.isEmpty() ||

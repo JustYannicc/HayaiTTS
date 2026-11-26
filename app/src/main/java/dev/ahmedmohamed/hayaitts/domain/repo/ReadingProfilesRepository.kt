@@ -12,6 +12,9 @@ interface ReadingProfilesRepository {
     val profiles: Flow<List<LanguageProfile>>
     suspend fun setProfiles(profiles: List<LanguageProfile>)
 
+    /** Atomic read-modify-write, so concurrent editors (settings sync, Reading screen) can't lose each other's edits. */
+    suspend fun updateProfiles(transform: (List<LanguageProfile>) -> List<LanguageProfile>)
+
     /** Master switch for engines that send text off the device (Edge). */
     val onlineEnginesEnabled: Flow<Boolean>
     suspend fun setOnlineEnginesEnabled(enabled: Boolean)

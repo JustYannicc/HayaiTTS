@@ -554,8 +554,7 @@ class SherpaTtsRuntime private constructor(
         }
     }
 
-    private fun String.languageHead(): String =
-        trim().replace('_', '-').substringBefore('-').lowercase()
+    private fun String.languageHead(): String = dev.ahmedmohamed.hayaitts.domain.model.LanguageTags.base(this)
 
     companion object {
         /** Languages sherpa-onnx's Supertonic accepts; anything else returns no audio. */

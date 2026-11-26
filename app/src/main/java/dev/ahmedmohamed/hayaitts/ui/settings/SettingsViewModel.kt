@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ahmedmohamed.hayaitts.core.dispatchers.DispatcherProvider
 import dev.ahmedmohamed.hayaitts.data.storage.StorageMigrator
+import dev.ahmedmohamed.hayaitts.domain.model.LanguageTags
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.MoveProgress
 import dev.ahmedmohamed.hayaitts.domain.model.StorageLocation
@@ -105,12 +106,13 @@ class SettingsViewModel(
     private val cacheClearedEvents = MutableStateFlow<Long?>(null)
     val cacheClearedBytes: StateFlow<Long?> = cacheClearedEvents.asStateFlow()
 
-    /** Every BCP-47 language tag present anywhere in the catalog, alpha-sorted. */
+    /** Every base language in the catalog (`en`, not `en-US`/`en-GB`), alpha-sorted. */
     val catalogLanguages: StateFlow<List<String>> = catalog.catalog
-        .map { c -> c.flatMap { it.languages }.distinct().sorted() }
+        .map { c -> c.flatMap { it.languages }.map(LanguageTags::base).filter { it.length in 2..3 }.distinct().sorted() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyList())
 
     val allowedLanguages: StateFlow<Set<String>> = settings.allowedLanguages
+        .map { tags -> tags.mapTo(mutableSetOf(), LanguageTags::base) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptySet())
 
     fun setAllowedLanguages(value: Set<String>) {

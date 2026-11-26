@@ -8,6 +8,22 @@ package dev.ahmedmohamed.hayaitts.domain.model
  */
 object ReadingProfileEdits {
 
+    /**
+     * Makes the profile list cover exactly [allowedBases] (base languages like
+     * `de`): keeps existing profiles (and their order and routes) for allowed
+     * languages, drops the others, and appends a profile for each newly
+     * allowed language from [newProfile].
+     */
+    fun reconcile(
+        profiles: List<LanguageProfile>,
+        allowedBases: Set<String>,
+        newProfile: (base: String) -> LanguageProfile,
+    ): List<LanguageProfile> {
+        val kept = profiles.filter { LanguageTags.base(it.language) in allowedBases }
+        val have = kept.mapTo(mutableSetOf()) { LanguageTags.base(it.language) }
+        return kept + allowedBases.filter { it !in have }.sorted().map(newProfile)
+    }
+
     fun addLanguage(profiles: List<LanguageProfile>, language: String, routes: List<VoiceRoute>): List<LanguageProfile> {
         if (language.isBlank() || profiles.any { it.language.equals(language, ignoreCase = true) }) return profiles
         return profiles + LanguageProfile(language, routes.distinct().ifEmpty { listOf(VoiceRoute.LocalAuto) })
