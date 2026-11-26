@@ -35,7 +35,8 @@ class ReadingViewModelTest {
         override suspend fun markSeeded() = Unit
     }
 
-    private class FakeEngines(override val onlineAvailable: Boolean) : SpeechEnginesGateway {
+    private class FakeEngines(private val online: Boolean) : SpeechEnginesGateway {
+        override suspend fun onlineAvailable() = online
         var benched = true
         var result: Outcome<SpokenSample>? = null
         var played: SpokenSample? = null
@@ -45,10 +46,10 @@ class ReadingViewModelTest {
             RouteVoice(VoiceRoute("edge", "de-AT-JonasNeural"), "Jonas", listOf("de-AT")),
             RouteVoice(VoiceRoute("edge", "fr-FR-DeniseNeural"), "Denise", listOf("fr-FR")),
         )
-        override fun defaultRoutesFor(language: String) = listOf(VoiceRoute("edge", "$language-Default"), VoiceRoute.LocalAuto)
+        override suspend fun defaultRoutesFor(language: String) = listOf(VoiceRoute("edge", "$language-Default"), VoiceRoute.LocalAuto)
         override fun isOnlineBenched() = benched
         override fun resetHealth() { benched = false }
-        override suspend fun synthesizeSample(profile: LanguageProfile, onlineEnabled: Boolean) = result!!
+        override suspend fun synthesizeSample(profile: LanguageProfile) = result!!
         override suspend fun play(sample: SpokenSample) { played = sample }
         override fun stopPlayback() = Unit
     }

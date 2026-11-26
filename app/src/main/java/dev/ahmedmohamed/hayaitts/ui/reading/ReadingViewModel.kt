@@ -68,7 +68,7 @@ class ReadingViewModel(
         fun voiceName(route: VoiceRoute): String? = voices.firstOrNull { it.route == route }?.displayName
     }
 
-    private val local = MutableStateFlow(UiState(onlineAvailable = engines.onlineAvailable))
+    private val local = MutableStateFlow(UiState())
     private val editLock = Mutex()
     private val testJobs = HashMap<String, Job>()
 
@@ -83,8 +83,9 @@ class ReadingViewModel(
     /** Reloads voices (new installs, Edge's list arriving) and Edge health. Call on resume. */
     fun refresh() {
         viewModelScope.launch {
+            val online = engines.onlineAvailable()
             val voices = engines.voices()
-            local.update { it.copy(voices = voices, onlineBenched = engines.isOnlineBenched()) }
+            local.update { it.copy(onlineAvailable = online, voices = voices, onlineBenched = engines.isOnlineBenched()) }
         }
     }
 
@@ -116,13 +117,13 @@ class ReadingViewModel(
     fun test(language: String) {
         stopTest(language)
         setTest(language, TestState.Running)
-        testJobs[language] = viewModelScope.launch {
+        val job = viewModelScope.launch {
             val profile = repo.profiles.first().firstOrNull { it.language == language }
             if (profile == null) {
                 stopTest(language)
                 return@launch
             }
-            when (val out = engines.synthesizeSample(profile, repo.onlineEnginesEnabled.first())) {
+            when (val out = engines.synthesizeSample(profile)) {
                 is Outcome.Success -> {
                     setTest(language, TestState.Spoke(out.value.route, out.value.voiceName))
                     local.update { it.copy(onlineBenched = engines.isOnlineBenched()) }
@@ -134,10 +135,14 @@ class ReadingViewModel(
                 }
             }
         }
+        testJobs[language] = job
+        job.invokeOnCompletion { if (testJobs[language] === job) testJobs.remove(language) }
     }
 
     private fun stopTest(language: String) {
-        testJobs.remove(language)?.let {
+        // Only a test that's still running owns the shared player; a finished
+        // one must not stop another language's playback.
+        testJobs.remove(language)?.takeIf { it.isActive }?.let {
             it.cancel()
             engines.stopPlayback()
         }
@@ -146,7 +151,7 @@ class ReadingViewModel(
 
     private fun setTest(language: String, state: TestState) = local.update { it.copy(tests = it.tests + (language to state)) }
 
-    private fun edit(change: (List<LanguageProfile>) -> List<LanguageProfile>) {
+    private fun edit(change: suspend (List<LanguageProfile>) -> List<LanguageProfile>) {
         viewModelScope.launch {
             editLock.withLock {
                 val current = repo.profiles.first()

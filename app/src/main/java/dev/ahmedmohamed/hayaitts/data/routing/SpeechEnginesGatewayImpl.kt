@@ -17,7 +17,6 @@ import dev.ahmedmohamed.hayaitts.tts.engine.EngineKind
 import dev.ahmedmohamed.hayaitts.tts.engine.EngineUnavailable
 import dev.ahmedmohamed.hayaitts.tts.engine.Engines
 import dev.ahmedmohamed.hayaitts.tts.engine.ReadingDefaults
-import dev.ahmedmohamed.hayaitts.tts.engine.RoutePlanner
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -31,7 +30,7 @@ class SpeechEnginesGatewayImpl(
 
     private val engines: Engines get() = Engines.get(context)
 
-    override val onlineAvailable: Boolean get() = engines.edge != null
+    override suspend fun onlineAvailable(): Boolean = withContext(dispatchers.default) { engines.edge != null }
 
     override suspend fun voices(): List<RouteVoice> = withContext(dispatchers.default) {
         val local = engines.local.installed().flatMap { v ->
@@ -48,20 +47,20 @@ class SpeechEnginesGatewayImpl(
         local + online
     }
 
-    override fun defaultRoutesFor(language: String): List<VoiceRoute> =
+    override suspend fun defaultRoutesFor(language: String): List<VoiceRoute> = withContext(dispatchers.default) {
         ReadingDefaults.defaultsFor(listOf(language), engines.edge).first().routes
+    }
 
     override fun isOnlineBenched(): Boolean = engines.edge != null && engines.router.isBenched(EngineKind.EDGE)
 
     override fun resetHealth() = engines.router.resetHealth()
 
-    override suspend fun synthesizeSample(profile: LanguageProfile, onlineEnabled: Boolean): Outcome<SpokenSample> =
-        withContext(dispatchers.default) {
+    // io: an online route blocks on the network for seconds.
+    override suspend fun synthesizeSample(profile: LanguageProfile): Outcome<SpokenSample> =
+        withContext(dispatchers.io) {
             val ctx = currentCoroutineContext()
             runCatchingOutcome(classify = ::classify) {
-                val local = engines.local
-                val planner = RoutePlanner(listOf(profile), onlineEnabled && engines.edge != null) { lang -> local.bestVoiceFor(lang)?.voiceId }
-                val routes = planner.routesFor(profile.language)
+                val routes = engines.planner(listOf(profile)).routesFor(profile.language)
                 val text = SampleTexts.forLanguage(profile.language)
                 val routed = engines.router.synthesize(routes, text, profile.language, 1f, 1f) { !ctx.isActive }
                 val name = voices().firstOrNull { it.route == routed.route }?.displayName ?: routed.route.voiceId

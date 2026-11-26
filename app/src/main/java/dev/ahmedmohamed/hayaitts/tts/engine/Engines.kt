@@ -43,7 +43,8 @@ class Engines private constructor(context: Context) {
     fun onlineEnabled(): Boolean =
         edge != null && (profilesRepo?.let { runCatching { runBlocking { it.onlineEnginesEnabled.first() } }.getOrNull() } ?: true)
 
-    fun planner(): RoutePlanner = RoutePlanner(profiles(), onlineEnabled()) { lang -> local.bestVoiceFor(lang)?.voiceId }
+    fun planner(profiles: List<LanguageProfile> = profiles()): RoutePlanner =
+        RoutePlanner(profiles, onlineEnabled()) { lang -> local.bestVoiceFor(lang)?.voiceId }
 
     companion object {
         @SuppressLint("StaticFieldLeak") // application context only

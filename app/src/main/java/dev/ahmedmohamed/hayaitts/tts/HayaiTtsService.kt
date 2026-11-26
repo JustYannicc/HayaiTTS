@@ -13,6 +13,9 @@ import dev.ahmedmohamed.hayaitts.domain.model.VoiceRoute
 import dev.ahmedmohamed.hayaitts.tts.engine.Engines
 import dev.ahmedmohamed.hayaitts.tts.engine.LocalSpeechEngine
 import dev.ahmedmohamed.hayaitts.tts.engine.Resampler
+import dev.ahmedmohamed.hayaitts.tts.engine.SpeechRouter
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * System-wide TTS engine.
@@ -130,30 +133,43 @@ class HayaiTtsService : TextToSpeechService() {
 
         val speed = (request.speechRate / 100f).coerceIn(0.25f, 4f)
         val pitch = (request.pitch / 100f).coerceIn(0.25f, 4f)
+        var lastError = TextToSpeech.ERROR_SYNTHESIS
+
+        // Section i+1 is synthesized on a worker while section i streams, so
+        // there's no network/model pause between sections.
+        val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "hayai-synth-prefetch") }
+        fun launch(i: Int): Future<SpeechRouter.Routed?> = worker.submit<SpeechRouter.Routed?> {
+            val routes = planner.routesFor(languages[i], explicit)
+            try {
+                engines.router.synthesize(routes, sections[i].text, languages[i], speed, pitch) { stopRequested }
+            } catch (t: Throwable) {
+                if (!stopRequested) log.e(t) { "No route could read section $i (${languages[i]}, routes=$routes)" }
+                if (routes.isEmpty()) lastError = TextToSpeech.ERROR_NOT_INSTALLED_YET
+                null
+            }
+        }
+
         var outRate = 0
         var frames = 0
-        var lastError = TextToSpeech.ERROR_SYNTHESIS
-        for ((i, section) in sections.withIndex()) {
-            if (stopRequested) break
-            if (i == 1) languages = assign(sections.map { it.text })
-            val routes = planner.routesFor(languages[i], explicit)
-            val routed = try {
-                engines.router.synthesize(routes, section.text, languages[i], speed, pitch) { stopRequested }
-            } catch (t: Throwable) {
+        try {
+            var next: Future<SpeechRouter.Routed?>? = launch(0)
+            for ((i, section) in sections.withIndex()) {
                 if (stopRequested) break
-                log.e(t) { "No route could read section $i (${languages[i]}, routes=$routes)" }
-                if (routes.isEmpty()) lastError = TextToSpeech.ERROR_NOT_INSTALLED_YET
-                continue // one unreadable section shouldn't silence the rest
+                val routed = next?.get()
+                if (i == 0) languages = assign(sections.map { it.text })
+                next = if (i + 1 < sections.size && !stopRequested) launch(i + 1) else null
+                if (routed == null || stopRequested) continue // one unreadable section shouldn't silence the rest
+                if (outRate == 0) {
+                    outRate = routed.audio.sampleRate
+                    if (callback.start(outRate, AudioFormat.ENCODING_PCM_16BIT, 1) != TextToSpeech.SUCCESS) return
+                }
+                val samples = Resampler.resample(routed.audio.samples, routed.audio.sampleRate, outRate)
+                callback.rangeStart(frames, section.start, section.end)
+                if (!streamPcm(callback, samples)) return
+                frames += samples.size
             }
-            if (stopRequested) break
-            if (outRate == 0) {
-                outRate = routed.audio.sampleRate
-                if (callback.start(outRate, AudioFormat.ENCODING_PCM_16BIT, 1) != TextToSpeech.SUCCESS) return
-            }
-            val samples = Resampler.resample(routed.audio.samples, routed.audio.sampleRate, outRate)
-            callback.rangeStart(frames, section.start, section.end)
-            if (!streamPcm(callback, samples)) return
-            frames += samples.size
+        } finally {
+            worker.shutdownNow()
         }
         if (outRate == 0) {
             if (stopRequested) {

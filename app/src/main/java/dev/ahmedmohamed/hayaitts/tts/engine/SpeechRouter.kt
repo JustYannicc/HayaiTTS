@@ -1,5 +1,7 @@
 package dev.ahmedmohamed.hayaitts.tts.engine
 
+import java.util.concurrent.CancellationException
+
 import dev.ahmedmohamed.hayaitts.domain.model.VoiceRoute
 
 /**
@@ -47,7 +49,7 @@ class SpeechRouter(
         val healthy = usable.filterNot { isBenched(EngineKind.fromId(it.engine)!!) }
         var last: Exception? = null
         for (route in healthy.ifEmpty { usable }) {
-            if (isCancelled()) throw EngineFailure("Cancelled")
+            if (isCancelled()) throw CancellationException("Cancelled")
             val kind = EngineKind.fromId(route.engine)!!
             try {
                 val audio = engines.getValue(kind).synthesize(route.voiceId, text, language, speed, pitch, isCancelled)
@@ -58,6 +60,11 @@ class SpeechRouter(
                 last = e
             } catch (e: EngineFailure) {
                 last = e
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // An engine bug shouldn't skip the remaining routes.
+                last = EngineFailure(e.message ?: e.javaClass.simpleName, e)
             }
         }
         throw last ?: EngineFailure("No route produced audio")

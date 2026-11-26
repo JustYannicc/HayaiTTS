@@ -67,6 +67,47 @@ class SystemTtsClientTest {
         assertTrue("wav too small: ${out.length()}", out.length() > 44 + 32_000)
     }
 
+    @Test
+    fun edgeVoiceSpeaksThroughTheFrameworkClient() {
+        val edge = tts.voices.orEmpty().firstOrNull { it.name == "edge:de-DE-KatjaNeural" }
+        assumeTrue("Edge voices not exposed (online engines off?)", edge != null)
+        assertEquals(TextToSpeech.SUCCESS, tts.setVoice(edge))
+        val out = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "hayai-edge.wav").apply { delete() }
+        val done = CountDownLatch(1)
+        var error: Int? = null
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) = Unit
+            override fun onDone(id: String?) = done.countDown()
+            @Deprecated("old API") override fun onError(id: String?) { error = -1; done.countDown() }
+            override fun onError(id: String?, code: Int) { error = code; done.countDown() }
+        })
+        assertEquals(TextToSpeech.SUCCESS, tts.synthesizeToFile("Hallo, das ist ein Test über Edge.", null, out, "edge"))
+        assertTrue("synthesis timed out", done.await(60, TimeUnit.SECONDS))
+        assertEquals(null, error)
+        // 24 kHz 16-bit: > ~0.8 s of audio.
+        assertTrue("wav too small: ${out.length()}", out.length() > 44 + 38_000)
+    }
+
+    @Test
+    fun germanFallsBackToAnInstalledMultilingualVoice() {
+        // Online engines may be on; force the on-device path with a local voice.
+        val local = tts.voices.orEmpty().firstOrNull { it.locale.language == "de" && !it.isNetworkConnectionRequired && !it.name.startsWith("chain:") }
+            ?: tts.voices.orEmpty().firstOrNull { it.name.startsWith("sherpa-onnx-supertonic-3") }
+        assumeTrue("no German-capable local voice installed", local != null)
+        tts.setVoice(local)
+        tts.language = Locale.GERMANY
+        val out = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "hayai-de.wav").apply { delete() }
+        val done = CountDownLatch(1)
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) = Unit
+            override fun onDone(id: String?) = done.countDown()
+            @Deprecated("old API") override fun onError(id: String?) = done.countDown()
+        })
+        assertEquals(TextToSpeech.SUCCESS, tts.synthesizeToFile("Guten Morgen, wie geht es dir heute?", null, out, "de"))
+        assertTrue(done.await(120, TimeUnit.SECONDS))
+        assertTrue("wav too small: ${out.length()}", out.length() > 44 + 32_000)
+    }
+
     private companion object {
         const val ENGINE = "dev.ahmedmohamed.hayaitts"
     }

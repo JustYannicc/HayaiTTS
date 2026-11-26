@@ -18,7 +18,9 @@ import org.koin.core.context.GlobalContext
 object ReadingDefaults {
 
     fun seedInBackground(context: Context) {
-        Thread({ runCatching { seed(context) } }, "hayai-seed-profiles").start()
+        // Also builds the engine set here, so the first TTS request or the
+        // Reading screen never pays for it on the main thread.
+        Thread({ runCatching { Engines.get(context); seed(context) } }, "hayai-seed-profiles").start()
     }
 
     private fun seed(context: Context) = runBlocking {
