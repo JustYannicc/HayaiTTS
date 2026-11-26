@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SdStorage
@@ -81,6 +82,7 @@ import dev.ahmedmohamed.hayaitts.domain.model.UpdateChannel
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.StorageLocation
 import dev.ahmedmohamed.hayaitts.ui.help.HelpActivity
+import dev.ahmedmohamed.hayaitts.ui.reading.ReadingActivity
 import dev.ahmedmohamed.hayaitts.ui.theme.HayaiTtsTheme
 import dev.ahmedmohamed.hayaitts.ui.update.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -172,6 +174,8 @@ fun SettingsScreen(
 
     val labelDefaultsSection = stringResource(R.string.settings_section_defaults)
     val labelDefaultsEmpty = stringResource(R.string.settings_defaults_empty)
+    val labelReading = stringResource(R.string.reading_title) +
+        " " + stringResource(R.string.settings_reading_subtitle)
     val labelAllowedLanguages = stringResource(R.string.settings_allowed_languages) +
         " " + stringResource(R.string.settings_allowed_languages_subtitle)
 
@@ -215,6 +219,7 @@ fun SettingsScreen(
     val showDownloadsSection = matches(labelWifi, labelStorageLoc, labelStorageInternal, labelStorageExternal)
     val showDefaultsSection = matches(
         labelDefaultsEmpty,
+        labelReading,
         labelAllowedLanguages,
         *state.installedLocales.toTypedArray(),
     )
@@ -357,6 +362,16 @@ fun SettingsScreen(
             }
 
             if (showDefaultsSection) item("defaults_header") { SectionHeader(labelDefaultsSection) }
+            if (showDefaultsSection && matches(labelReading)) item("reading") {
+                ListItem(
+                    leadingContent = { Icon(Icons.Outlined.RecordVoiceOver, contentDescription = null) },
+                    headlineContent = { Text(stringResource(R.string.reading_title)) },
+                    supportingContent = { Text(stringResource(R.string.settings_reading_subtitle)) },
+                    modifier = Modifier.clickableRow {
+                        context.startActivity(Intent(context, ReadingActivity::class.java))
+                    },
+                )
+            }
             if (showDefaultsSection && matches(labelAllowedLanguages)) item("allowed_languages") {
                 ListItem(
                     leadingContent = {
@@ -700,7 +715,7 @@ private fun formatRelativeTime(epochMs: Long): String {
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+internal fun SectionHeader(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),

@@ -22,8 +22,11 @@ import dev.ahmedmohamed.hayaitts.data.tts.SherpaSynthesisGateway
 import dev.ahmedmohamed.hayaitts.ui.activity.ActivityViewModel
 import dev.ahmedmohamed.hayaitts.domain.repo.CatalogRepository
 import dev.ahmedmohamed.hayaitts.data.routing.ReadingProfilesRepositoryImpl
+import dev.ahmedmohamed.hayaitts.data.routing.SpeechEnginesGatewayImpl
 import dev.ahmedmohamed.hayaitts.domain.repo.DefaultsRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.ReadingProfilesRepository
+import dev.ahmedmohamed.hayaitts.domain.repo.SpeechEnginesGateway
+import dev.ahmedmohamed.hayaitts.ui.reading.ReadingViewModel
 import dev.ahmedmohamed.hayaitts.domain.repo.DownloadRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.SettingsRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.VoiceRepository
@@ -98,6 +101,7 @@ val appModule = module {
     // pick either (the TTS service grabs the impl for the snapshot helper).
     single<SettingsRepository> { SettingsRepositoryImpl(androidContext()) }
     single<ReadingProfilesRepository> { ReadingProfilesRepositoryImpl(androidContext()) }
+    single<SpeechEnginesGateway> { SpeechEnginesGatewayImpl(androidContext(), get(), get()) }
     single<VoiceRepositoryImpl> { VoiceRepositoryImpl(androidContext(), get()) }
     single<VoiceRepository> { get<VoiceRepositoryImpl>() }
     single<CatalogRepository> {
@@ -223,6 +227,7 @@ val appModule = module {
             catalog = get(),
         )
     }
+    viewModel { ReadingViewModel(repo = get(), engines = get()) }
     viewModel {
         UpdateViewModel(
             settings = get(),

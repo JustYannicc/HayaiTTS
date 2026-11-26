@@ -71,6 +71,10 @@
             android:name=".ui.help.HelpActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.reading.ReadingActivity"
+            android:exported="false" />
+
         <!-- Crash-report screen. Launched from a fresh task by
              CrashHandler when the previous task crashed; runs in its own
              process so it survives the dying app. -->
