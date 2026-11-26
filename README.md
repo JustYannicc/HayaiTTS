@@ -12,6 +12,30 @@
 
 </div>
 
+> **This is a fork** of [HayaiApp/HayaiTTS](https://github.com/HayaiApp/HayaiTTS)
+> that ships independently. Fixes go upstream as PRs
+> ([#11](https://github.com/HayaiApp/HayaiTTS/pull/11)–[#15](https://github.com/HayaiApp/HayaiTTS/pull/15)),
+> but this fork doesn't wait for them. The live catalog and in-app updates come from
+> this repo. What's different:
+>
+> - **Voice installs work again.** One resolver decides which file in a bundle fills which role,
+>   for the downloader, custom import and the runtime. Before, most catalog voices downloaded and
+>   were then thrown away.
+> - **It actually speaks as the system engine**: ISO3 locales, a real default voice, the
+>   CHECK_TTS_DATA/GET_SAMPLE_TEXT handshakes, sentence-by-section streaming and no 2000-char cut.
+> - **Per-language engine priority** (from [Narrateify](https://github.com/JustYannicc/Narrateify)):
+>   each language you read has an ordered list of engine + voice routes. The first one that works
+>   reads each section. An unreachable online engine is benched for 10 minutes, and an installed
+>   voice is always the last resort. With two languages, each section's language is detected on
+>   device, but only among yours.
+> - **Microsoft Edge online voices** as an opt-out engine (Settings → Reading). Text is sent to
+>   Microsoft when an Edge route reads it.
+> - Kokoro mixed-text crash fix, import by magic bytes, and catalog metadata fixes
+>   (634 voices, hashes from upstream `checksum.txt`).
+>
+> Releases: [JustYannicc/HayaiTTS/releases](https://github.com/JustYannicc/HayaiTTS/releases).
+> The fork is signed with its own key, so uninstall upstream HayaiTTS first.
+
 A drop-in replacement for the stock Android TTS engine. Synthesis happens
 locally on the phone via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 &mdash; no network, no account, no telemetry. Every app on the device that
