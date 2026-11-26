@@ -29,7 +29,7 @@ object ReadingDefaults {
     }
 
     fun defaultsFor(languages: List<String>, online: OnlineEngine?): List<LanguageProfile> = languages.map { tag ->
-        LanguageProfile(tag, listOfNotNull(online?.defaultVoiceFor(tag)?.let { VoiceRoute(VoiceRoute.ENGINE_EDGE, it) }, VoiceRoute.LocalAuto))
+        LanguageProfile(tag, listOfNotNull(online?.let { o -> o.defaultVoiceFor(tag)?.let { VoiceRoute(o.engine.kind.id, it) } }, VoiceRoute.LocalAuto))
     }
 
     private fun systemLanguages(): List<String> {

@@ -18,6 +18,9 @@ class RoutePlanner(
 ) {
     val languages: List<String> get() = profiles.map { it.language }
 
+    /** A planner lives for one request; resolve `auto` once per language, not per section. */
+    private val autoCache = HashMap<String, String?>()
+
     /** Profile whose language best matches [bcp47]: exact region first, then same base language. */
     fun profileFor(bcp47: String): LanguageProfile? {
         if (bcp47.isBlank()) return null
@@ -38,7 +41,7 @@ class RoutePlanner(
             .filter { onlineEnabled || it.engine != VoiceRoute.ENGINE_EDGE }
             .mapNotNull { route ->
                 if (route.engine == VoiceRoute.ENGINE_LOCAL && route.voiceId == VoiceRoute.AUTO) {
-                    resolveLocalAuto(language)?.let { VoiceRoute(VoiceRoute.ENGINE_LOCAL, it) }
+                    autoCache.getOrPut(language) { resolveLocalAuto(language) }?.let { VoiceRoute(VoiceRoute.ENGINE_LOCAL, it) }
                 } else route
             }
             .distinct()

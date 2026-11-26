@@ -18,9 +18,9 @@ class CheckVoiceDataActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Thread {
-            val tags = runCatching { SherpaTtsRuntime.get(applicationContext).listAvailableVoices() }
+            // Same language set onIsLanguageAvailable() answers for.
+            val tags = runCatching { HayaiTtsService.availableLanguageTags(applicationContext) }
                 .getOrDefault(emptyList())
-                .flatMap { it.languages }
                 .mapNotNull { TtsLocales.toIso3(TtsLocales.toBcp47(it)) }
                 .distinct()
             val data = Intent()

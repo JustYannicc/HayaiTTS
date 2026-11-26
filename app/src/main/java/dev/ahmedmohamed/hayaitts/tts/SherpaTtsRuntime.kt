@@ -275,10 +275,19 @@ class SherpaTtsRuntime private constructor(
         return SynthesisOutput(sampleRate = rate, samples = mixed)
     }
 
+    @Volatile private var voicesCache: Pair<Long, List<InstalledVoice>>? = null
+
+    /**
+     * Installed voices, cached for [VOICES_TTL_MS] so one TTS request (many
+     * sections, several framework callbacks) does a single Room read.
+     */
     fun listAvailableVoices(): List<InstalledVoice> {
+        val now = System.currentTimeMillis()
+        voicesCache?.let { (at, list) -> if (now - at < VOICES_TTL_MS) return list }
         val repo = runCatching { GlobalContext.get().get<VoiceRepositoryImpl>() }.getOrNull()
             ?: return emptyList()
         return runCatching { runBlocking { repo.installedSnapshot() } }
+            .onSuccess { voicesCache = now to it }
             .getOrElse {
                 log.w(it) { "installedSnapshot failed; returning empty voice list" }
                 emptyList()
@@ -489,13 +498,8 @@ class SherpaTtsRuntime private constructor(
 
     private fun List<File>.joinPaths(): String = joinToString(",") { it.absolutePath }
 
-    private fun installedVoiceOf(voiceId: String): InstalledVoice? {
-        val repo = runCatching { GlobalContext.get().get<VoiceRepositoryImpl>() }.getOrNull()
-            ?: return null
-        val snapshot = runCatching { runBlocking { repo.installedSnapshot() } }.getOrNull()
-            ?: return null
-        return snapshot.firstOrNull { it.voiceId == voiceId }
-    }
+    private fun installedVoiceOf(voiceId: String): InstalledVoice? =
+        listAvailableVoices().firstOrNull { it.voiceId == voiceId }
 
     private fun runtimeFamily(voice: InstalledVoice): ModelFamily = if (voice.family == ModelFamily.CUSTOM) {
         voice.effectiveFamily ?: error(
@@ -542,6 +546,7 @@ class SherpaTtsRuntime private constructor(
          * the per-voice cap runs first then the global LRU enforces the ceiling.
          */
         private const val MAX_LENGTH_BUCKETS_PER_VOICE = 2
+        private const val VOICES_TTL_MS = 3_000L
 
         // We always pass applicationContext into the constructor below, so the
         // held context is process-scoped and not an actual leak. Lint can't see

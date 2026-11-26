@@ -1,6 +1,7 @@
 package dev.ahmedmohamed.hayaitts.data.routing
 
 import android.content.Context
+import co.touchlab.kermit.Logger
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,7 +22,11 @@ class ReadingProfilesRepositoryImpl(private val context: Context) : ReadingProfi
     private val json = Json { ignoreUnknownKeys = true }
 
     override val profiles: Flow<List<LanguageProfile>> = store.data.map { prefs ->
-        prefs[KEY_PROFILES]?.let { raw -> runCatching { json.decodeFromString(serializer, raw) }.getOrNull() }.orEmpty()
+        prefs[KEY_PROFILES]?.let { raw ->
+            runCatching { json.decodeFromString(serializer, raw) }
+                .onFailure { Logger.withTag("ReadingProfiles").e(it) { "Saved profiles unreadable; using none" } }
+                .getOrNull()
+        }.orEmpty()
     }
 
     override suspend fun setProfiles(profiles: List<LanguageProfile>) {

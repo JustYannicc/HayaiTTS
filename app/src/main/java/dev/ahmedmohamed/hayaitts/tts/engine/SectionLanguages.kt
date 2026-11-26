@@ -6,7 +6,9 @@ package dev.ahmedmohamed.hayaitts.tts.engine
  * otherwise a section of [minDetectChars]+ overrides the running context
  * only if the guess equals it or is confident, only longer sections move the
  * context, and a short section between two neighbours that agree is snapped
- * to them. Anything not in [languages] is read as the closest of them.
+ * to them. Guesses outside [languages] are ignored, so such text stays in
+ * the surrounding language. Languages are matched by base code, so keep at
+ * most one region per language (en-US *or* en-GB).
  *
  * [detect] returns base-language → confidence (e.g. `de` → 0.93), or null.
  */

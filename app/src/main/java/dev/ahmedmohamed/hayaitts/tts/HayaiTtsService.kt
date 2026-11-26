@@ -11,6 +11,7 @@ import dev.ahmedmohamed.hayaitts.data.voices.parseLocale
 import dev.ahmedmohamed.hayaitts.domain.model.InstalledVoice
 import dev.ahmedmohamed.hayaitts.domain.model.VoiceRoute
 import dev.ahmedmohamed.hayaitts.tts.engine.Engines
+import dev.ahmedmohamed.hayaitts.tts.engine.LocalSpeechEngine
 import dev.ahmedmohamed.hayaitts.tts.engine.Resampler
 
 /**
@@ -36,7 +37,7 @@ class HayaiTtsService : TextToSpeechService() {
     override fun onIsLanguageAvailable(lang: String?, country: String?, variant: String?): Int {
         val requested = TtsLocales.toBcp47(lang, country)
         if (requested.isEmpty()) return TextToSpeech.LANG_NOT_SUPPORTED
-        val tags = localVoices().flatMap { it.languages } + engines.planner().languages
+        val tags = availableLanguageTags(applicationContext)
         return when (TtsLocales.matchLevel(tags, requested)) {
             TtsLocales.COUNTRY -> TextToSpeech.LANG_COUNTRY_AVAILABLE
             TtsLocales.LANGUAGE -> TextToSpeech.LANG_AVAILABLE
@@ -108,7 +109,7 @@ class HayaiTtsService : TextToSpeechService() {
         val planner = engines.planner()
 
         val voiceName = request.voiceName?.takeIf { it.isNotBlank() } ?: lastSelectedVoiceName
-        val explicit = explicitRoute(voiceName)
+        val explicit = explicitRoute(voiceName, request.params?.getString("speakerId")?.toIntOrNull())
         val requestLocale = TtsLocales.toBcp47(request.language, request.country)
         val baseLanguage = requestLocale.ifBlank { languageOfVoiceName(voiceName) ?: "en-US" }
 
@@ -118,31 +119,31 @@ class HayaiTtsService : TextToSpeechService() {
             return
         }
         // A specific voice pins the language; a priority list lets each
-        // section pick among the user's languages.
-        val languages = if (explicit != null) {
-            List(sections.size) { baseLanguage }
-        } else {
-            val initial = planner.profileFor(baseLanguage)?.language ?: baseLanguage
-            engines.sectionLanguages.assign(sections.map { it.text }, planner.languages, initial)
-        }
+        // section pick among the user's languages. The first section is
+        // assigned on its own so detection over a long text never delays
+        // the first audio; the rest is assigned once that's streaming.
+        val initial = planner.profileFor(baseLanguage)?.language ?: baseLanguage
+        fun assign(texts: List<String>) =
+            if (explicit != null) List(texts.size) { baseLanguage }
+            else engines.sectionLanguages.assign(texts, planner.languages, initial)
+        var languages = assign(listOf(sections.first().text))
 
         val speed = (request.speechRate / 100f).coerceIn(0.25f, 4f)
         val pitch = (request.pitch / 100f).coerceIn(0.25f, 4f)
         var outRate = 0
         var frames = 0
+        var lastError = TextToSpeech.ERROR_SYNTHESIS
         for ((i, section) in sections.withIndex()) {
             if (stopRequested) break
+            if (i == 1) languages = assign(sections.map { it.text })
             val routes = planner.routesFor(languages[i], explicit)
             val routed = try {
                 engines.router.synthesize(routes, section.text, languages[i], speed, pitch) { stopRequested }
             } catch (t: Throwable) {
                 if (stopRequested) break
                 log.e(t) { "No route could read section $i (${languages[i]}, routes=$routes)" }
-                if (outRate == 0) {
-                    callback.error(if (routes.isEmpty()) TextToSpeech.ERROR_NOT_INSTALLED_YET else TextToSpeech.ERROR_SYNTHESIS)
-                    return
-                }
-                continue
+                if (routes.isEmpty()) lastError = TextToSpeech.ERROR_NOT_INSTALLED_YET
+                continue // one unreadable section shouldn't silence the rest
             }
             if (stopRequested) break
             if (outRate == 0) {
@@ -154,7 +155,14 @@ class HayaiTtsService : TextToSpeechService() {
             if (!streamPcm(callback, samples)) return
             frames += samples.size
         }
-        if (outRate == 0 && callback.start(DEFAULT_RATE, AudioFormat.ENCODING_PCM_16BIT, 1) != TextToSpeech.SUCCESS) return
+        if (outRate == 0) {
+            if (stopRequested) {
+                if (callback.start(DEFAULT_RATE, AudioFormat.ENCODING_PCM_16BIT, 1) == TextToSpeech.SUCCESS) callback.done()
+            } else {
+                callback.error(lastError)
+            }
+            return
+        }
         callback.done()
     }
 
@@ -175,18 +183,20 @@ class HayaiTtsService : TextToSpeechService() {
         name.startsWith(CHAIN) -> engines.planner().profiles.any { it.language == name.removePrefix(CHAIN) }
         name.startsWith(EDGE) -> engines.edge != null
         else -> {
-            val parts = name.split('#', limit = 3)
-            val voice = localVoices().firstOrNull { it.voiceId == parts[0] }
-            val sid = parts.getOrNull(1)?.toIntOrNull()
+            val (id, sid) = LocalSpeechEngine.parse(name)
+            val voice = localVoices().firstOrNull { it.voiceId == id }
             voice != null && (sid == null || voice.speakers.any { it.id == sid })
         }
     }
 
     /** The voice a caller picked, as a route; null for chain voices or nothing. */
-    private fun explicitRoute(name: String): VoiceRoute? = when {
+    private fun explicitRoute(name: String, speakerParam: Int? = null): VoiceRoute? = when {
         name.isBlank() || name.startsWith(CHAIN) -> null
         name.startsWith(EDGE) -> VoiceRoute(VoiceRoute.ENGINE_EDGE, name.removePrefix(EDGE))
-        isKnownVoiceName(name) -> VoiceRoute(VoiceRoute.ENGINE_LOCAL, name.split('#', limit = 3).take(2).joinToString("#"))
+        isKnownVoiceName(name) -> LocalSpeechEngine.parse(name).let { (id, parsed) ->
+            val sid = parsed ?: speakerParam
+            VoiceRoute(VoiceRoute.ENGINE_LOCAL, if (sid == null) id else "$id#$sid")
+        }
         else -> null
     }
 
@@ -194,7 +204,7 @@ class HayaiTtsService : TextToSpeechService() {
         name.isBlank() -> null
         name.startsWith(CHAIN) -> name.removePrefix(CHAIN)
         name.startsWith(EDGE) -> name.removePrefix(EDGE).split('-').take(2).joinToString("-")
-        else -> localVoices().firstOrNull { it.voiceId == name.substringBefore('#') }
+        else -> localVoices().firstOrNull { it.voiceId == LocalSpeechEngine.parse(name).first }
             ?.languages?.firstOrNull()?.let { TtsLocales.toBcp47(it) }
     }
 
@@ -227,10 +237,17 @@ class HayaiTtsService : TextToSpeechService() {
         return true
     }
 
-    private companion object {
-        const val BYTES_PER_SAMPLE = 2
-        const val DEFAULT_RATE = 22050
-        const val CHAIN = "chain:"
-        const val EDGE = "edge:"
+    companion object {
+        /** Languages the engine can speak: installed voices plus the user's priority lists. */
+        fun availableLanguageTags(context: android.content.Context): List<String> {
+            val engines = Engines.get(context)
+            return runCatching { engines.local.installed() }.getOrDefault(emptyList()).flatMap { it.languages } +
+                engines.planner().languages
+        }
+
+        private const val BYTES_PER_SAMPLE = 2
+        private const val DEFAULT_RATE = 22050
+        private const val CHAIN = "chain:"
+        private const val EDGE = "edge:"
     }
 }
