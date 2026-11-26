@@ -21,7 +21,9 @@ import dev.ahmedmohamed.hayaitts.data.telemetry.SynthesisTelemetryRepository
 import dev.ahmedmohamed.hayaitts.data.tts.SherpaSynthesisGateway
 import dev.ahmedmohamed.hayaitts.ui.activity.ActivityViewModel
 import dev.ahmedmohamed.hayaitts.domain.repo.CatalogRepository
+import dev.ahmedmohamed.hayaitts.data.routing.ReadingProfilesRepositoryImpl
 import dev.ahmedmohamed.hayaitts.domain.repo.DefaultsRepository
+import dev.ahmedmohamed.hayaitts.domain.repo.ReadingProfilesRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.DownloadRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.SettingsRepository
 import dev.ahmedmohamed.hayaitts.domain.repo.VoiceRepository
@@ -95,6 +97,7 @@ val appModule = module {
     // Repositories. Bind both the interface and the impl class so callers can
     // pick either (the TTS service grabs the impl for the snapshot helper).
     single<SettingsRepository> { SettingsRepositoryImpl(androidContext()) }
+    single<ReadingProfilesRepository> { ReadingProfilesRepositoryImpl(androidContext()) }
     single<VoiceRepositoryImpl> { VoiceRepositoryImpl(androidContext(), get()) }
     single<VoiceRepository> { get<VoiceRepositoryImpl>() }
     single<CatalogRepository> {
